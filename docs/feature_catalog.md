@@ -2,7 +2,7 @@
 
 Candidate model inputs for a next-day forecasting model on 11 US single stocks and the 11 Select Sector SPDR ETFs. Every feature is a function of data available at or before the close of trading day $t$, computed from the asset's own daily OHLCV, calendar, fundamental, flow and options data. External series (indexes, rates, macro) are listed separately in [Indexes and external data](indexes_and_external_data.md).
 
-The catalog is split into one file per family. Each row gives the feature, a plain-language definition of what it measures and why it might carry information, the exact formula, and the default parameters. Formulas use the shared notation below. Row counts are table rows; most rows define a family of columns (one per window or parameter), so the catalog describes roughly 2,000 candidate columns from about 790 feature definitions.
+The catalog is split into one file per family. Each row gives the feature, a plain-language definition of what it measures and why it might carry information, the exact formula, the default parameters, and an evidence grade with its source (see [Evidence grades](#evidence-grades)). Formulas use the shared notation below. Row counts are table rows; most rows define a family of columns (one per window or parameter), so the catalog describes roughly 2,000 candidate columns from about 790 feature definitions.
 
 | File | Family | Rows |
 | --- | --- | --- |
@@ -18,6 +18,7 @@ The catalog is split into one file per family. Each row gives the feature, a pla
 | [stock_fundamentals.md](features/stock_fundamentals.md) | Earnings, estimates, valuation, quality, ownership, short interest, text (stocks only) | 84 |
 | [etf.md](features/etf.md) | Flows, NAV, holdings breadth and dispersion, rotation (ETFs only) | 34 |
 | [options.md](features/options.md) | Implied volatility, skew, term structure, positioning, model-free moments | 45 |
+| [references.md](features/references.md) | Full citations for every source named in the Evidence columns | |
 
 ## Shared notation
 
@@ -69,6 +70,43 @@ Pick one primary label; the others work as auxiliary tasks, sanity checks or siz
 | Trend-scaling label | Lopez de Prado's trend label: sign of the $t$-statistic of a regression of price on time over the forward window with the highest $\lvert t \rvert$. | $y_t = \operatorname{sgn}\big(\hat t_{\hat h}\big)$, $\hat h = \arg\max_{h \in H} \lvert \hat t_h \rvert$, $\hat t_h$ = $t$-stat of the slope of $\ln C$ on $\{1..h\}$ over $t+1..t+h$ | $H = \{5, \dots, 20\}$ |
 | Forward max favorable and adverse excursion | Best and worst paths over the next $h$ days; inputs for stop and target placement. | $MFE = \ln(\max_{1 \le i \le h} H_{t+i} / C_t)$, $MAE = \ln(\min_{1 \le i \le h} L_{t+i} / C_t)$ | $h = 5, 10$ |
 | Forward drawdown flag | Whether the path falls more than $d$ before the horizon; a risk-aware auxiliary target. | $y_t = \mathbb{1}[\min_{1 \le i \le h} \ln(L_{t+i}/C_t) < -d\,\sigma_t]$ | $d = 2$, $h = 10$ |
+
+## Evidence grades
+
+Every row in the family files carries an **Evidence** column: a grade and the source that defines the feature or documents its use. Full citations are in [references.md](features/references.md). The grades are:
+
+| Grade | Meaning | Rows |
+| --- | --- | --- |
+| **A** | A peer-reviewed paper documents that the feature predicts returns (or volatility, where stated) out of sample, usually in a monthly cross-section of US stocks. | 188 |
+| **B** | A validated estimator or model from econometrics or statistics. The source proves it measures what it claims (efficiency, consistency), not that it predicts returns. | 91 |
+| **C** | A classical technical indicator with a named author, book or library source. Definitions are reliable; the academic evidence on profitability is mixed to negative. | 225 |
+| **D** | A generic time-series descriptor or a construction derived for this catalog (ratios, z-scores, percentiles, flags, windows). Standard feature-engineering practice, not a published finding. | 235 |
+
+One row cross-references another file. Counts by family:
+
+| Family | A | B | C | D |
+| --- | --- | --- | --- | --- |
+| Stock fundamentals | 69 | 5 | 0 | 10 |
+| Returns and momentum | 30 | 1 | 2 | 55 |
+| Statistical and risk | 25 | 44 | 3 | 45 |
+| Options | 20 | 5 | 10 | 10 |
+| Calendar | 15 | 1 | 0 | 13 |
+| ETF | 13 | 0 | 5 | 15 |
+| Volume and liquidity | 9 | 10 | 25 | 18 |
+| Volatility | 5 | 24 | 10 | 24 |
+| Price action | 2 | 0 | 39 | 22 |
+| Trend | 0 | 1 | 79 | 16 |
+| Oscillators | 0 | 0 | 52 | 7 |
+
+What the grades imply for this project:
+
+1. **Grade A evidence was produced on a different problem.** Almost all of it comes from monthly or weekly cross-sectional sorts over hundreds or thousands of stocks spanning decades. Nothing here has been shown to work on next-day returns of 22 liquid large caps and sector ETFs. Expect effect sizes to be far smaller at the daily horizon and in a universe this narrow.
+2. **Published effects decay.** McLean and Pontiff (2016) find anomaly returns fall by about a third after publication and more than half after academic publication plus trading. Harvey, Liu and Zhu (2016) argue most published factors fail a multiple-testing hurdle; Hou, Xue and Zhang (2020) fail to replicate the majority of 452 anomalies at conventional significance; Jensen, Kelly and Pedersen (2023) are more optimistic but still find modest post-publication returns. Treat Grade A as "worth testing first", not "known to work".
+3. **Technical indicators have the weakest record.** Brock, Lakonishok and LeBaron (1992) found moving-average and range-breakout rules profitable on the Dow through 1986; Sullivan, Timmermann and White (1999) showed the result does not survive data-snooping adjustment or the post-1986 sample. Park and Irwin (2007) survey 95 studies: positive results concentrate in older or less rigorous work. Marshall, Young and Rose (2006) find candlestick patterns have no value on Dow stocks. The honest case for Grade C rows is that they are cheap nonlinear transforms of recent prices that a model may use or ignore.
+4. **Grade B measures are reliable as measurements.** Range-based volatility estimators, GARCH and HAR, variance ratios, structural-break tests and spread estimators do what they claim. Volatility forecasts in particular are well validated and feed directly into position sizing and the volatility-scaled targets; their value as return predictors is indirect.
+5. **Grade D rows are hypotheses.** Nobody has shown that, for example, the five-day change in the 21-day Sharpe ratio predicts anything. They are included because tree models can exploit such transforms cheaply, and they should be the first candidates to prune.
+
+A defensible first model uses the Grade A rows that are computable from the available data, plus a handful of Grade B volatility measures and the calendar flags, and adds Grade C and D rows only when a purged cross-validation shows they help.
 
 ## Rules for using the list
 

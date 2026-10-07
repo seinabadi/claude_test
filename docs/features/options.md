@@ -1,0 +1,68 @@
+# Options-implied features (the asset's own listed options)
+
+Back to the [catalog index](../feature_catalog.md) for notation. Source: an end-of-day options chain or a vendor surface (ORATS, CBOE DataShop, OptionMetrics); every stock and ETF in this set has liquid options. $S_t$ = spot, $K$ = strike, $T$ = time to expiry in years, $q$ = dividend yield, $r$ = risk-free rate, $F = S e^{(r - q)T}$ = forward. $IV(K, T)$ is the Black-Scholes implied volatility: the $\sigma$ that solves $C^{mkt} = S e^{-qT}N(d_1) - K e^{-rT}N(d_2)$, $d_{1,2} = \dfrac{\ln(F/K) \pm \sigma^2 T/2}{\sigma\sqrt T}$. Use the mid of bid and ask.
+
+## Implied-volatility level and dynamics
+
+| Feature | Definition | Formula | Parameters |
+| --- | --- | --- | --- |
+| ATM implied volatility | Forward-at-the-money IV interpolated to constant tenors; the market's forecast of volatility. Interpolate in total variance (the CBOE method), never in volatility; single-stock options are American, so use vendor IVs from a binomial or Barone-Adesi-Whaley inversion. | $IV^{ATM}(T)$ = IV at $K = F$ (average of the call and put IV at the strike nearest the forward, or the 50-delta IV); constant tenor $\tau$: $IV_\tau^2\,\tau = w\,IV_1^2 T_1 + (1-w)\,IV_2^2 T_2$, $w = \dfrac{T_2 - \tau}{T_2 - T_1}$, $T$ in calendar days / 365 | $\tau$ = 7, 30, 60, 90, 180 calendar days |
+| IV rank | Position of IV30 within its one-year high-low range. | $IVR_t = \dfrac{IV^{30}_t - \min_{252} IV^{30}}{\max_{252} IV^{30} - \min_{252} IV^{30}}$ | 252 |
+| IV percentile | Share of the last year's days with lower IV30. | $\operatorname{prank}_{252}(IV^{30})_t$ | 252 |
+| IV change | Change in IV30 over 1, 5 and 21 days (An, Ang, Bali and Cakici 2014: rising call IV predicts higher returns, rising put IV lower). | $\Delta_k IV^{30}_t$; separately $\Delta_k IV^{call}$, $\Delta_k IV^{put}$ | 1, 5, 21 |
+| IV z-score | IV30 against its one-year mean and std. | $z_{252}(IV^{30})_t$ | 252 |
+| IV vs sector and market IV | Asset IV30 minus the sector ETF's and SPY's. | $IV^{30}_t - IV^{30,S}_t$; $IV^{30}_t - VIX_t/100$ | |
+| Variance risk premium | Implied minus realized variance over matched horizons (Bollerslev, Tauchen and Zhou 2009); a high VRP predicts higher returns. The volatility-unit version $IV^{30} - \sigma_{21}$ is a different but related quantity. | $VRP_t = (IV^{30}_t)^2 - 252\cdot\frac{1}{21}\sum_{i<21} r^2_{t-i}$; model version $(IV^{30}_t)^2 - \frac{252}{21}\sum_{h=1}^{21}\hat\sigma^2_{t+h}$ with the GARCH $h$-step forecasts | fixed |
+| Volatility spread (realized-implied ratio) | Realized over implied. | $\sigma_{21}(t)/IV^{30}_t$ | |
+| IV term-structure slope | Longer minus shorter tenor IV; an inverted curve (short IV above long) signals event risk or stress. | $IV^{90}/IV^{30} - 1$; $IV^{7}/IV^{30} - 1$; $\mathbb{1}[IV^{30} > IV^{90}]$ | fixed |
+| Forward implied volatility | Implied volatility between two tenors. | $IV^{fwd}_{T_1, T_2} = \sqrt{\dfrac{IV_2^2 T_2 - IV_1^2 T_1}{T_2 - T_1}}$ | 30 to 60, 60 to 90 |
+| IV term-structure change | Five-day change in the slope. | $\Delta_5(IV^{90}/IV^{30})$ | |
+
+## Skew, smile and model-free moments
+
+| Feature | Definition | Formula | Parameters |
+| --- | --- | --- | --- |
+| 25-delta skew | Put IV minus call IV at 25 delta: the price of downside protection relative to upside. Market convention quotes the risk reversal with the opposite sign ($RR = IV^{call} - IV^{put}$); this catalog uses put minus call throughout so that the sign matches the Xing-Zhang-Zhao skew. Normalize by ATM IV for cross-asset comparison. | $SK^{25}_T = IV(\Delta_p = -0.25, T) - IV(\Delta_c = 0.25, T)$; $SK^{25}_T / IV^{ATM}_T$ | $T$ = 30, 90 |
+| 25-delta butterfly | Average wing IV minus ATM IV: smile curvature or tail richness. | $BF^{25}_T = \tfrac{1}{2}\big(IV(\Delta_p = -0.25) + IV(\Delta_c = 0.25)\big) - IV^{ATM}$ | 30 |
+| Xing-Zhang-Zhao skew | OTM put IV minus ATM call IV (Xing, Zhang and Zhao 2010); steep skew predicts lower returns. | $SKEW^{XZZ}_t = IV^{put}(K/S \approx 0.95) - IV^{call}(K/S \approx 1.0)$ at 30 days | 30 |
+| Put-call parity IV spread | Cremers and Weinbaum (2010): call IV minus put IV at matched strikes and maturities, open-interest weighted; positive values predict higher returns. | $CW_t = \sum_j w_j\big(IV^{call}_j - IV^{put}_j\big)$, $w_j$ = average open interest of the pair | 30 |
+| Bali-Hovakimian volatility spread | Realized minus implied volatility and the call-put IV spread as return predictors. | $\sigma_{21} - IV^{30}$; $IV^{call,ATM} - IV^{put,ATM}$ | 30 |
+| Skew slope | Slope of IV against log moneyness across the smile. | OLS slope of $IV(K)$ on $\ln(K/F)$ over $\lvert \ln(K/F) \rvert < 0.1$ | 30 |
+| Model-free implied variance | Britten-Jones and Neuberger (2000); the CBOE VIX construction applied to the asset's own chain. It is also the variance-swap rate used in the Carr-Wu (2009) premium $RV - SW$. | $\sigma^2_{MF}(T) = \dfrac{2}{T}\sum_i \dfrac{\Delta K_i}{K_i^2}e^{rT}Q(K_i) - \dfrac{1}{T}\Big(\dfrac{F}{K_0} - 1\Big)^2$; $F = K^* + e^{rT}[C(K^*) - P(K^*)]$ at the strike with the smallest $\lvert C - P \rvert$; $K_0$ the first strike at or below $F$; $Q(K_i)$ the OTM mid (average of put and call at $K_0$); $\Delta K_i = (K_{i+1} - K_{i-1})/2$; stop after two consecutive zero bids; 30-day value by total-variance interpolation of the two bracketing expiries | 30 |
+| Model-free implied skewness | Bakshi, Kapadia and Madan (2003): risk-neutral skewness from OTM option prices. | $V = \int_S^\infty \dfrac{2(1 - \ln(K/S))}{K^2}C(K)dK + \int_0^S \dfrac{2(1 + \ln(S/K))}{K^2}P(K)dK$; $W = \int_S^\infty \dfrac{6\ln(K/S) - 3\ln^2(K/S)}{K^2}C\,dK - \int_0^S \dfrac{6\ln(S/K) + 3\ln^2(S/K)}{K^2}P\,dK$; $X = \int_S^\infty \dfrac{12\ln^2(K/S) - 4\ln^3(K/S)}{K^2}C\,dK + \int_0^S \dfrac{12\ln^2(S/K) + 4\ln^3(S/K)}{K^2}P\,dK$; $\mu = e^{rT} - 1 - \tfrac{e^{rT}}{2}V - \tfrac{e^{rT}}{6}W - \tfrac{e^{rT}}{24}X$; $SKEW = \dfrac{e^{rT}W - 3\mu e^{rT}V + 2\mu^3}{(e^{rT}V - \mu^2)^{3/2}}$ | 30 |
+| Model-free implied kurtosis | Same source. | $KURT = \dfrac{e^{rT}X - 4\mu e^{rT}W + 6e^{rT}\mu^2 V - 3\mu^4}{(e^{rT}V - \mu^2)^2}$ | 30 |
+| Skew percentile and change | 25-delta skew against its history. | $\operatorname{prank}_{252}(SK^{25})$; $\Delta_5 SK^{25}$ | 252 |
+| Vol surface PCA | First three components of the daily surface across tenors and deltas: level, term slope, skew. | PCA on the standardized $IV(\Delta, T)$ grid over the trailing 252 days; scores at $t$ | 252 |
+
+## Expected moves
+
+| Feature | Definition | Formula | Parameters |
+| --- | --- | --- | --- |
+| Implied one-day move | IV30 scaled to one day, as a return. Black-Scholes IV is annualized in calendar time, so $\sqrt{1/365}$ is the strict conversion and $\sqrt{1/252}$ the trading-day convention; they differ by 20%, so pick one and keep it. | $EM^{1d}_t = IV^{30}_t / \sqrt{252}$ | |
+| Straddle-implied move | Price of the nearest-expiry ATM straddle over spot; the market's expected absolute move to expiry. Brenner and Subrahmanyam (1988): the straddle is about $\sqrt{2/\pi}\,S\sigma\sqrt T \approx 0.8\,\sigma\sqrt T$, so the one-sigma move is about 1.25 times the straddle. | $\dfrac{C^{ATM} + P^{ATM}}{S_t}$; implied $\sigma \approx \sqrt{2\pi/T}\,\dfrac{C^{ATM} + P^{ATM}}{2S_t}$ | nearest expiry |
+| Implied earnings move | Extra variance in the expiry straddling earnings against the next expiry (stocks only). | $EM^{E} = \sqrt{\max\big(IV_1^2 T_1 - IV^2_{fwd}(T_1 - 1/252), 0\big)}$ with $IV_{fwd}$ from the next two expiries; or the straddle move minus the normal daily move | per event |
+| Realized vs implied move | Yesterday's absolute return against the move the market implied. | $\lvert r_t \rvert / EM^{1d}_{t-1}$; its 21-day mean | 1, 21 |
+| Implied move percentile | Rank of the implied one-day move over one year. | $\operatorname{prank}_{252}(EM^{1d})$ | 252 |
+
+## Volume, open interest and positioning
+
+| Feature | Definition | Formula | Parameters |
+| --- | --- | --- | --- |
+| Put/call volume ratio | Puts traded over calls traded, with trailing means and z-score; extreme readings are contrarian. | $PCR^V_t = V^{put}_t / V^{call}_t$; $\mu_5$, $\mu_{21}$; $z_{63}$ | 1, 5, 21 |
+| Put/call open-interest ratio | Outstanding puts over calls. | $PCR^{OI}_t = OI^{put}_t / OI^{call}_t$ | 1 |
+| Option-to-stock volume ratio | Roll, Schwartz and Subrahmanyam (2010); Johnson and So (2012): share-equivalent option volume over stock volume, summed over the week; high O/S predicts lower returns. The notional-over-dollar-volume ratio reduces to the same quantity. | $O/S_t = \dfrac{100\sum_{d=t-4}^{t} V^{opt}_d}{\sum_{d=t-4}^{t} V_d}$; daily version; $z_{252}(O/S)$ | 5, 1 |
+| Options volume | Total contracts relative to the trailing mean; premium-dollar volume over stock dollar volume. | $V^{opt}_t / \mu_{21}(V^{opt})$; $\dfrac{\sum_j V_j \cdot 100 \cdot \text{mid}_j}{DV_t}$ | 1, 21 |
+| Open-interest change | Change in total OI, split by calls and puts. | $\Delta_1 OI^{call}$, $\Delta_1 OI^{put}$, $\Delta_5 OI$ | 1, 5 |
+| OI concentration | Share of OI in the nearest expiry and days to that expiry. | $OI_{T_1}/\sum_T OI_T$; $T_1$ in days | fixed |
+| Max pain | Strike that minimizes the total intrinsic value paid out to option holders at the nearest expiry, as a distance from spot. | $K^{MP} = \arg\min_K \sum_j\big[OI^{call}_j\max(K - K_j, 0) + OI^{put}_j\max(K_j - K, 0)\big]$; feature $S_t/K^{MP} - 1$ | nearest expiry |
+| Call wall and put wall | Strikes with the largest call and put OI (or gamma) in the nearest monthly expiry, as distances from spot. | $S_t / K^{call}_{\max OI} - 1$; $S_t / K^{put}_{\max OI} - 1$ | nearest monthly |
+| Gamma exposure (GEX) | SqueezeMetrics convention: net dealer gamma assuming dealers are long the calls and short the puts customers hold (an assumption about positioning, not data); dollars of delta hedge dealers must trade per 1% move. Positive GEX dampens moves, negative amplifies. | $GEX_t = \sum_j \Gamma_j\,OI_j\,100\,S_t^2\,0.01\,\cdot(+1 \text{ for calls}, -1 \text{ for puts})$; normalize by $DV_t$ or by $\mu_{21}(DV)$ | all expiries |
+| Zero-gamma level | Spot level where net GEX crosses zero: recompute GEX on a grid of hypothetical spots (gamma re-evaluated at each spot with current IVs) and interpolate the sign change. | $\ln(S^{0} / S_t)$ | |
+| Vanna and charm exposure | Dealer sensitivity of delta to IV and to time; hedging flows as IV falls or expiry approaches. | $\sum_j \dfrac{\partial\Delta_j}{\partial\sigma}OI_j\,100\,S_t$; $\sum_j \dfrac{\partial\Delta_j}{\partial T}OI_j\,100\,S_t$ | all expiries |
+| Net delta of open interest | Dealer-hedged share inventory implied by OI. | $\sum_j \Delta_j OI_j\,100 \cdot (\pm 1)$, over shares outstanding | |
+| Unusual options activity | Volume above 3 times open interest at a strike, or a block larger than 5000 contracts. | $\mathbb{1}[\exists j: V_j > 3\,OI_j]$; count | 1 |
+| Implied correlation (ETFs) | ETF implied variance against the weighted constituent implied variances (the CBOE implied correlation index construction, on the top holdings with weights renormalized to one). | $\rho^{imp} = \dfrac{\sigma^2_{ETF} - \sum_i w_i^2\sigma_i^2}{(\sum_i w_i\sigma_i)^2 - \sum_i w_i^2\sigma_i^2}$; quick form $\sigma^2_{ETF}/(\sum_i w_i\sigma_i)^2$ | 30 |
+| Dispersion premium (ETFs) | Weighted constituent IV minus ETF IV. | $\sum_i w_i IV_i - IV_{ETF}$ | 30 |
+| Delta-hedged option gain | Bakshi and Kapadia (2003): gain on an ATM call held for a month with a daily-rebalanced stock hedge; negative on average when the volatility risk premium is negative. | $\Pi_{t,t+\tau} = C_{t+\tau} - C_t - \sum_{n}\Delta_{t_n}(S_{t_{n+1}} - S_{t_n}) - \sum_n \dfrac{a_n r}{365}(C_{t_n} - \Delta_{t_n}S_{t_n})$, $\Delta$ the Black-Scholes delta at the option's IV, $a_n$ calendar days between rebalances; feature $\Pi / S_t$ over the last completed month | 21 |
+| Option-implied expected return | Martin and Wagner (2019): expected excess return from the asset's and the market's risk-neutral variance. | $SVIX^2_{i} = \dfrac{2}{R_f T S^2}\Big[\int_0^F P(K)dK + \int_F^\infty C(K)dK\Big]$; $E_t[R_i - R_f] \approx SVIX^2_{M} + \tfrac{1}{2}\big(SVIX^2_i - \sum_j w_j SVIX^2_j\big)$ with SPY for the market | 30, 90 |
+| Options-implied dividend and borrow | Implied dividend from put-call parity against the declared dividend; the gap measures hard-to-borrow or special dividend risk. | $D^{imp} = S - K e^{-rT} - (C - P)$ | nearest quarterly |

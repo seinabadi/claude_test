@@ -22,4 +22,4 @@ One US stock per GICS sector, picked as the sector's largest or most representat
 
 Picks come from memory (knowledge through mid-2026), not live market data, so confirm current market caps before relying on them; this is not personalized investment advice.
 
-Feature lists for the forecasting model: [Feature catalog](docs/feature_catalog.md) and [Indexes and external data](docs/indexes_and_external_data.md).
+Feature lists for the forecasting model: the [feature catalog](docs/feature_catalog.md) (index, notation, targets and rules, with one file per feature family under `docs/features/`, each giving a definition and formula per feature) and [Indexes and external data](docs/indexes_and_external_data.md).
